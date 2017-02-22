@@ -142,66 +142,66 @@ class UnoccupiedDist(OccupiedDist):
         self.area -= node.shape_area
         if node in self.perimeter:
             self.perimeter.remove(node)
-        neighbors = self.nodes.neighbors(node)  # state_graph.neighbors(node)
-        for neighbor in neighbors:
-            if neighbor not in self.perimeter:
-                self.perimeter.append(neighbor)
+        neighbors = self.nodes.neighbors(node)  # (QUESTION) This whole thing could be a helper, right?
+        for neighbor in neighbors:  # check the removed nodes neighbors
+            if neighbor not in self.perimeter:  # if the neighbor is not in the perimeter, it should be. Nodes are removed from unoc when they are added to something else.
+                self.perimeter.append(neighbor)  # add the node to the perimeter.
         self.nodes.remove_node(node)
 
 
 class State(object):
     """Manages how tracts are distributed into districts in a particular state.
-
-    build_district(self, start, population):
+a
+    build_district(self, start, population): (QUESTION) Should this be formatted differently?
     creates a new district stemming from the start node with a given population
 
-    fill_state(self, request): continues to build districts until all unoccupied tracts are claimed
+    fill_state(self, request): continues to build districts until all unoccupied tracts are claimed (QUESTION) or until there are 7 districts?
     """
 
     def __init__(self, request, num_dst):
         """Build unoccupied district(s) for entire state."""
-        self.unoccupied = []
-        self.districts = []
+        self.unoccupied = []  # Unoccupied Districts: usually only 1
+        self.districts = []  # Occupied districts
         self.population = 0
         self.area = 0
-        self.num_dst = num_dst
+        self.num_dst = num_dst  # The Number of districts alotted for that state (7 for Colorado)
         self.state_graph = fill_graph(request)
-        landmass = nx.connected_components(self.state_graph)
-        for island in landmass:
-            unoc = UnoccupiedDist(None, self.state_graph, tracts=island)
+        landmass = nx.connected_components(self.state_graph)  # Returns all of the connected/contiguous areas of land, for a state.
+        for island in landmass:  # Island is set of nodes.
+            unoc = UnoccupiedDist(None, self.state_graph, tracts=island)  # needs the state graph for its edges
             for tract in unoc.nodes.nodes():
-                if tract.isborder == 1:
-                    unoc.perimeter.append(tract)
-            self.population += unoc.population
-            self.unoccupied.append(unoc)
+                if tract.isborder == 1:  # this is a hardcoded field for colorado.  A challenge of adding more states is finding these automatically.
+                    unoc.perimeter.append(tract)  # begin with all border tracts in the perimeter.
+            self.population += unoc.population  # (QUESTION) Can a growing district grab from a different unoc??? e.g. if its a nearby island
+            self.unoccupied.append(unoc)  # Each island or separate landmass gets added to the unoccupied district list.
             self.area += unoc.area
-        self.target_pop = self.population // num_dst
+        self.target_pop = self.population // num_dst  # Average available population is the target population.  It could theorhetically drift high or low, but it hasn't been a problem.  It helps split the remaining popuation.
 
     def fill_state(self, request, criteria):
         """Build districts until all unoccupied tracts are claimed."""
         from gerrypy.graph_db_interact.assigndistrict import assign_district, populate_district_table
 
-        for num in range(self.num_dst):
+        for num in range(self.num_dst):  # Build the number of desired districts.  For each:
             rem_pop = 0
             for unoc in self.unoccupied:
-                rem_pop += unoc.population
-            rem_dist = self.num_dst - len(self.districts)
+                rem_pop += unoc.population  # Set the total remaining population not in a district.
+            rem_dist = self.num_dst - len(self.districts)  # (QUESTION) This could also be '- num' yeah?
             tgt_population = rem_pop / rem_dist
             self.build_district(tgt_population, num + 1, criteria)
-        assign_district(request, self.state_graph)
-        populate_district_table(request, self)
-        if self.unoccupied:
-            return False
+        assign_district(request, self.state_graph)  # Assigns the district ID to all tracts in the DB
+        populate_district_table(request, self)  # Creates the DistrictView DB View for the finished districts. 
+        if self.unoccupied:  # If there are remaining unclaimed tracts
+            return False  # (QUESTION) This is not being used I dont think.
         return True
 
     def build_district(self, tgt_population, dist_num, criteria):
         """Create a new district stemming from the start node with a given population."""
         dst = OccupiedDist(dist_num, self.state_graph)
         self.districts.append(dst)
-        start = self.find_start()
-        self.swap(dst, start) #if state is full, this wont work
+        start = self.find_start()  # Selects the first node for the District
+        self.swap(dst, start)  # if state is full, this wont work
         while True:
-            new_tract = self.select_next(dst, criteria)
+            new_tract = self.select_next(dst, criteria)  # Selects the best choice for the next tract, given criteria
             if new_tract is None:
                 for unoc in self.unoccupied:
                     if not len(unoc.nodes.nodes()):
