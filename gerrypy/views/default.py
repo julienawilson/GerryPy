@@ -7,26 +7,26 @@ from gerrypy.models.mymodel import DistrictView
 @view_config(route_name='home', renderer='../templates/home.jinja2')
 def home_view(request):
     """Return css yes...for the home page."""
-    return {'css': 'yes'}
+    return {'css': 'yes'}  # why did we do this??(QUESTION)
 
 
 @view_config(route_name='map', renderer='../templates/map.jinja2')
 def map_view(request):
     """If form submitted, generate districts and return map with geojson."""
-    if request.GET:
+    if request.GET:  # Why does this not get called every time you visit the page? (QUESTION)
         criteria = {
-            'county' : request.GET['countyweight'],
-            'compactness' : request.GET['compactweight']
+            'county': request.GET['countyweight'],
+            'compactness': request.GET['compactweight']
         }
         num_dst = 7
-        state = State(request, num_dst)
-        state.fill_state(request, criteria)
-        with open('gerrypy/views/geo.json', 'w') as the_file:
+        state = State(request, num_dst)  # why are we adding the request (QUESTION)
+        state.fill_state(request, criteria)  # why are we adding the request (QUESTION)
+        with open('gerrypy/views/geo.json', 'w') as the_file:  # This builds the API for google maps to read.
             the_file.write(build_JSON(request))
         return {'geojson': 'ok'}
     return {}
 
-
+# (QUESTION) Rename 'fial' to something that makes sense 
 @view_config(route_name='about', renderer='../templates/about.jinja2')
 def about_view(request):
     """Return info about gerrypy creator extraordinaires."""
