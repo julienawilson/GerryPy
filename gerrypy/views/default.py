@@ -54,13 +54,12 @@ def about_view(request):
 
 def build_JSON(request):
     """Build JSON from the polygons in the database."""
-    json_string = '{"type": "FeatureCollection","features": ['
-
-    # query = request.dbsession.query(Tract.geom.ST_AsGeoJSON()).all()
+    # (QUESTION) Is this geoalchemy?
     geojson_queries = request.dbsession.query(DistrictView.geom.ST_AsGeoJSON()).all()
     properties = request.dbsession.query(DistrictView).all()
     colors = ['blue', 'red', 'yellow', 'purple', 'orange', 'green', 'black']
 
+    json_string = '{"type": "FeatureCollection","features": ['
     for idx, block in enumerate(properties):
         json_string += '{' + '"type": "Feature", "properties": '
         json_string += '{'

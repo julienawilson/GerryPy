@@ -7,6 +7,9 @@ from gerrypy.models.mymodel import Tract, Edge
 import networkx as nx
 
 
+#  The tracts are ever tract
+#  Edges represent every border between tracts.
+#  Fill Graph makes a Network X graph with every tract as a node, and borders as edges.
 def fill_graph(request):
     """Build global graph from tract and edge databases."""
     graph = nx.Graph()
@@ -49,12 +52,12 @@ class OccupiedDist(object):
         """Add node to nodes and updates district properties."""
         node.districtid = self.districtID
         self.nodes.add_node(node)
-        for edge in state_graph.neighbors(node):
+        for edge in state_graph.neighbors(node):  # (QUESTION) What does this do?
             if edge in self.nodes.nodes():
                 self.nodes.add_edge(edge, node)
-        self.population += node.tract_pop
+        self.population += node.tract_pop  # update the stats for the district
         self.area += node.shape_area
-        if node in self.perimeter:
+        if node in self.perimeter:  # Update the perimeter
             self.perimeter.remove(node)
         neighbors = state_graph.neighbors(node)
         for neighbor in neighbors:
@@ -65,24 +68,25 @@ class OccupiedDist(object):
         """Remove node from nodes and updates district properties."""
         self.population -= node.tract_pop
         self.nodes.remove_node(node)
-        self.area -= node.shape_area
+        self.area -= node.shape_area 
         neighbors = state_graph.neighbors(node)
         to_perimeter = False
-        for neighbor in neighbors:
+        for neighbor in neighbors:  # Decide whether to remove nodes from the perimeter.
             takeout = True
-            if neighbor in self.perimeter:
+            if neighbor in self.perimeter:  # if its a perimeter node,
                 neighborneighbors = state_graph.neighbors(neighbor)
-                for neighborneighbor in neighborneighbors:
-                    if neighborneighbor in self.nodes.nodes():
-                        takeout = False
-                if takeout:
-                    self.perimeter.remove(neighbor)
-            elif neighbor in self.nodes.nodes():
-                to_perimeter = True
-        if to_perimeter:
-            self.perimeter.append(node)
+                for neighborneighbor in neighborneighbors:  # check its neighbors
+                    if neighborneighbor in self.nodes.nodes():  # if it has a neighbor in the district
+                        takeout = False  # it should remain in the perimeter list.
+                if takeout:  # If it should be removed,
+                    self.perimeter.remove(neighbor)  # Remove it!
+            elif neighbor in self.nodes.nodes():  # If the removed node neighbors the district (which it should)
+                to_perimeter = True  # mark it to be added to the perimeter
+        if to_perimeter:  # If its marked,
+            self.perimeter.append(node)  # add it to the perimeter
 
 
+# (QUESTION) Should we maybe just make this not inhereit anymore
 class UnoccupiedDist(OccupiedDist):
     """A structure to contain tracts that haven't been claimed by a district.
 
@@ -94,8 +98,8 @@ class UnoccupiedDist(OccupiedDist):
     """
 
     def __init__(self, districtID, state_graph, tracts=None):
-        """."""
-        self.nodes = nx.Graph()
+        """."""  # (QUESTION) Fix this
+        self.nodes = nx.Graph()  # (QUESTION) is this the best name for it? thats why we have to do nodes.nodes()
         self.perimeter = []
         self.population = 0
         self.area = 0
@@ -111,16 +115,16 @@ class UnoccupiedDist(OccupiedDist):
         """Add node to nodes and updates district properties accordingly."""
         node.districtid = None
         self.nodes.add_node(node)
-        for neighbor in state_graph.neighbors(node):
+        for neighbor in state_graph.neighbors(node):  # After node is added, make the edge connections within the unoccupied district.
             if neighbor in self.nodes:
                 self.nodes.add_edge(neighbor, node)
-        self.population += node.tract_pop
+        self.population += node.tract_pop  # Update stats
         self.area += node.shape_area
         neighbors = state_graph.neighbors(node)
         to_add = False
         for neighbor in neighbors:
             takeout = True
-            if neighbor in self.perimeter:
+            if neighbor in self.perimeter:  # (QUESTION) map this one out
                 neighborneighbors = state_graph.neighbors(neighbor)
                 for neighborneighbor in neighborneighbors:
                     if neighborneighbor not in self.nodes:
@@ -138,7 +142,7 @@ class UnoccupiedDist(OccupiedDist):
         self.area -= node.shape_area
         if node in self.perimeter:
             self.perimeter.remove(node)
-        neighbors = self.nodes.neighbors(node) #state_graph.neighbors(node)
+        neighbors = self.nodes.neighbors(node)  # state_graph.neighbors(node)
         for neighbor in neighbors:
             if neighbor not in self.perimeter:
                 self.perimeter.append(neighbor)
