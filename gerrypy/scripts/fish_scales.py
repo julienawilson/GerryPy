@@ -199,68 +199,68 @@ a
         dst = OccupiedDist(dist_num, self.state_graph)
         self.districts.append(dst)
         start = self.find_start()  # Selects the first node for the District
-        self.swap(dst, start)  # if state is full, this wont work
+        self.swap(dst, start)  # if state is full, this wont work (QUESTION) check on this
         while True:
             new_tract = self.select_next(dst, criteria)  # Selects the best choice for the next tract, given criteria
-            if new_tract is None:
-                for unoc in self.unoccupied:
+            if new_tract is None:  # (QUESTION) when is new_tract none?  No more nodes in unoc.
+                for unoc in self.unoccupied:  # I think this triggers when we're done, it removes empty unoccupied districts.
                     if not len(unoc.nodes.nodes()):
                         self.unoccupied.remove(unoc)
-                break
-            high_pop = (new_tract.tract_pop + dst.population)
-            if abs(high_pop - tgt_population) > abs(dst.population - tgt_population):
-                break
+                break  # If its empty, we stopp building.
+            high_pop = (new_tract.tract_pop + dst.population)  # Population including the next tract.
+            if abs(high_pop - tgt_population) > abs(dst.population - tgt_population):  # If the population including the next district is further from the goal,
+                break  # we stop building.
             else:
-                self.swap(dst, new_tract)
-                neighbors = self.state_graph.neighbors(new_tract)
-                unassigned_neighbors = [neighbor for neighbor in neighbors if neighbor in self.unoccupied[0].nodes]
-                if len(unassigned_neighbors) > 1:
+                self.swap(dst, new_tract)  # Swap removes the tract from its unoccupied district and adds it to the occupied district.
+                neighbors = self.state_graph.neighbors(new_tract)  # ok this part is tricky.
+                unassigned_neighbors = [neighbor for neighbor in neighbors if neighbor in self.unoccupied[0].nodes]  # grab the new nodes unassigned neighbors
+                if len(unassigned_neighbors) > 1:  # If there is more than one, than a split is possible. (QUESTION) why did we check this?
                     for i in range(len(unassigned_neighbors)):
-                        if not nx.has_path(
-                            self.unoccupied[0].nodes,
+                        if not nx.has_path(  # We check each node and its previous neighbor to ensure they're connected. (thanks, nx)
+                            self.unoccupied[0].nodes,  # (QUESTION) IS there ever actually more than one thing in the unoc nodes
                             unassigned_neighbors[i],
                             unassigned_neighbors[i - 1]
-                        ):
-                            unoc_neighbors = [x for x in nx.connected_components(self.unoccupied[0].nodes)]
+                        ):  # If there is a split in the unoccupied district...
+                            unoc_neighbors = [x for x in nx.connected_components(self.unoccupied[0].nodes)]  # Identify each of the distinct unoccupied districts.
                             biggest = max(unoc_neighbors, key=lambda x: len(x))
-                            unoc_neighbors.remove(biggest)
-
-                            for neigh in unoc_neighbors:
-                                for tract in neigh:
+                            unoc_neighbors.remove(biggest)  # Ignore the largest
+                            # all unoccupied districts will be bordering, because as soon as there is a split, we do this.
+                            for neigh in unoc_neighbors:  # Consume all of the rest (usually one small one)
+                                for tract in neigh:  # This sometimes gives us a district that is too large, and is a major focus of ours right now.
                                     self.swap(dst, tract)
                             break
 
-    def swap(self, dst, new_tract):
+    def swap(self, dst, new_tract):  # (QUESTION) removes a node from the unoccupied district, puts in in the dst
         """Exchange tract from unoccupied district to district."""
         # unoc_dst = None
         # for island in self.unoccupied:
         #     if new_tract in island.perimeter:
-        #         unoc_dst = island
+        #         unoc_dst = island  #(QUESTION) This is all we need?
         self.unoccupied[0].rem_node(new_tract, self.state_graph)
         dst.add_node(new_tract, self.state_graph)
         # return unoc_dst
 
-    def select_next(self, dst, criteria):
+    def select_next(self, dst, criteria):  # Select the next best node to join the District
         """Choose the next best tract to add to growing district."""
         best_rating = 0
-        best = None
-        for perimeter_tract in dst.perimeter:
-            if perimeter_tract.districtid is None:
-                count = 0
-                for neighbor in self.state_graph.neighbors(perimeter_tract):
-                    if neighbor.districtid == dst.districtID:
+        best = None  # We're going to build a score for each node based on our criteria.
+        for perimeter_tract in dst.perimeter:  # dst.perimeter is every unassigned node bordering that district.
+            if perimeter_tract.districtid is None:  # (QUESTION)  Was that a lie I just told? Does dst.permiter return all perm items?
+                count = 0  # (QUESTION) we're assigning all these district ids, but does that not get wrapped in to DB?  we use a separeate function to do that OH nvm i get it.  one is on a graph, one is on the model.
+                for neighbor in self.state_graph.neighbors(perimeter_tract):  # look at neighbors of each perimeter tract
+                    if neighbor.districtid == dst.districtID:  # Check how many tracts that tract borders that are ALREADY in the district.  More borders gets more points
                         count += 1
-                counties = set()
-                for node in dst.nodes:
+                counties = set()  # County Score
+                for node in dst.nodes:  # Find all the counties aleady in the district.
                     counties.add(node.county)
-                same_county = 0
-                if perimeter_tract.county in counties:
+                same_county = 0  
+                if perimeter_tract.county in counties:  # If the tracts county is in the district already, it gets a point.
                     same_county = 1
-                rating = count * int(criteria['compactness']) + same_county * int(criteria['county'])
+                rating = count * int(criteria['compactness']) + same_county * int(criteria['county'])  # Calculate score based on different criteria.  Recent version 
                 if rating > best_rating:
                     best_rating = rating
-                    best = perimeter_tract
-        return best
+                    best = perimeter_tract  # Save the best tract
+        return best  # Return it!  If there is not perimeter, or no neighbors with no district Id, we return None.
 
     def find_start(self):
         """
@@ -269,18 +269,18 @@ a
         """
         best_set = set()
         best = None
-        for tract in self.unoccupied[0].perimeter:
+        for tract in self.unoccupied[0].perimeter:  # Check nodes along unoc perimeter
             unique_dists = set()
-            for neighbor in self.state_graph.neighbors(tract):
-                for dst in self.districts:
+            for neighbor in self.state_graph.neighbors(tract):  # Look at each of its neighbors
+                for dst in self.districts:  # Record the number of districts it borders
                     if neighbor in dst.nodes.nodes():
                         unique_dists.add(dst)
-            if len(unique_dists) > len(best_set) or len(unique_dists) == 0:
+            if len(unique_dists) > len(best_set) or len(unique_dists) == 0:  # grab the node if it borders the mot districts, or if its the firt one we looked at.
                 best_set = unique_dists
                 best = tract
-        return best
+        return best  # Return that selected node to start on.
 
-    def split_unoccupied_dist(self, unoc_dst):
+    def split_unoccupied_dist(self, unoc_dst):  # (QUESTION) WE're not using this.  Delete it!
         """Remove unoccupied dist from State and adds contiguous unoccupied sub-districts."""
         self.unoccupied.remove(unoc_dst)
         index = len(self.unoccupied)

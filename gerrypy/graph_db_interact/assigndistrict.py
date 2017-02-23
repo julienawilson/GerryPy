@@ -1,7 +1,9 @@
 """Use the graph to assign districts to tracts."""
 from gerrypy.models.mymodel import Tract, District
+# (QUESTION) Stick this whole thing in the scripts file.
 
 
+# This is called at the end of fill state
 def assign_district(request, graph):
     """Assign a district ID to a single row in tract table."""
     # request.dbsession.execute('select * from reset_district();')
@@ -11,8 +13,9 @@ def assign_district(request, graph):
         request.dbsession.flush()
 
 
+# (QUESTION) No longer using this?
 def populate_district_table(request, state):
-    """Insert distrcts into district."""
+    """Insert districts into DistrictView."""
     request.dbsession.query(District).delete()
     for district in state.districts:
         new_district = District(districtid=district.districtID,

@@ -54,7 +54,9 @@ def about_view(request):
 
 def build_JSON(request):
     """Build JSON from the polygons in the database."""
-    # (QUESTION) Is this geoalchemy?
+    # (QUESTION) Is this geoalchemy?  (ANSWER) geom is built with geoalchemy, which means is has the geom/postgis function
+    # (QUESTION) what was the geoalchemy limit we had? Multi? how did we get around that?
+    # (ANSWER) using the view!  The view builds that new geom with a multitype.
     geojson_queries = request.dbsession.query(DistrictView.geom.ST_AsGeoJSON()).all()
     properties = request.dbsession.query(DistrictView).all()
     colors = ['blue', 'red', 'yellow', 'purple', 'orange', 'green', 'black']
